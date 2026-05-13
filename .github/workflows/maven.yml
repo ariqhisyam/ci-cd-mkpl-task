@@ -8,6 +8,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
+    types: [opened, synchronize, reopened]
     branches: [ main ]
 
 jobs:
@@ -16,38 +17,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout kode dari repository
+      # Step 1: Checkout kode dari repository (full history untuk SonarCloud blame)
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          # Fetch semua history agar SonarCloud bisa menganalisis blame info
           fetch-depth: 0
 
       # Step 2: Setup JDK 17 (diperlukan oleh SonarCloud scanner)
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
-          distribution: 'temurin'
-          cache: maven
+          distribution: 'zulu'
 
-      # Step 3: Validasi pom.xml (mencegah error konfigurasi Maven)
+      # Step 3: Cache SonarCloud packages (mempercepat analisis)
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      # Step 4: Cache Maven packages (mempercepat build)
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # Step 5: Validasi pom.xml (mencegah error konfigurasi Maven)
       - name: Validate Maven Project
         run: mvn -B validate --file pom.xml
 
-      # Step 4: Kompilasi source code (cepat mendeteksi error sintaks/kompilasi)
+      # Step 6: Kompilasi source code (cepat mendeteksi error sintaks/kompilasi)
       - name: Compile Source Code
         run: mvn -B compile --file pom.xml
 
-      # Step 5: Kompilasi test code (memastikan kode test juga bisa dikompilasi)
-      - name: Compile Test Code
-        run: mvn -B test-compile --file pom.xml
-
-      # Step 6: Jalankan JUnit Test + generate laporan JaCoCo coverage
+      # Step 7: Jalankan JUnit Test + generate laporan JaCoCo coverage
       - name: Run JUnit Tests & Generate Coverage Report
         run: mvn -B test --file pom.xml
 
-      # Step 7: Upload hasil laporan JUnit (tersedia meskipun test gagal)
+      # Step 8: Upload hasil laporan JUnit (tersedia meskipun test gagal)
       - name: Upload JUnit Test Report
         uses: actions/upload-artifact@v4
         if: always()
@@ -56,7 +67,7 @@ jobs:
           path: target/surefire-reports/
           retention-days: 7
 
-      # Step 8: Upload laporan JaCoCo coverage
+      # Step 9: Upload laporan JaCoCo coverage
       - name: Upload JaCoCo Coverage Report
         uses: actions/upload-artifact@v4
         if: always()
@@ -65,22 +76,12 @@ jobs:
           path: target/site/jacoco/
           retention-days: 7
 
-      # Step 9: Analisis kualitas kode dengan SonarCloud
-      - name: SonarCloud Analysis
+      # Step 10: Build & Analisis SonarCloud (cara resmi dari SonarCloud)
+      - name: Build and Analyze with SonarCloud
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          mvn -B verify sonar:sonar \
-            -DskipTests \
-            -Dsonar.projectKey=ariqhisyam_ci-cd-mkpl-task \
-            -Dsonar.organization=ariqhisyam \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-
-      # Step 10: Package project menjadi JAR (hanya jika semua test lulus)
-      - name: Package Project (JAR)
-        run: mvn -B package -DskipTests --file pom.xml
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -DskipTests -Dsonar.projectKey=ariqhisyam_ci-cd-mkpl-task
 
       # Step 11: Upload file JAR hasil build sebagai artifact
       - name: Upload JAR Artifact
