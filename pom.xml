@@ -1,6 +1,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.example</groupId>
+  <groupId>com.github.ariqhisyam</groupId>
   <artifactId>ci-cd-mkpl-task</artifactId>
   <version>1.1.0</version>
 
@@ -50,5 +50,14 @@
       </plugin>
     </plugins>
   </build>
+
+  <!-- Konfigurasi publish ke GitHub Packages -->
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/ariqhisyam/ci-cd-mkpl-task</url>
+    </repository>
+  </distributionManagement>
 
 </project>

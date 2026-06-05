@@ -1,0 +1,53 @@
+# Workflow ini mempublish artifact JAR ke GitHub Packages
+# Dijalankan otomatis setiap ada push ke branch main
+# Package akan muncul di halaman repository GitHub pada bagian "Packages"
+
+name: Publish to GitHub Packages
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  publish:
+    name: Build & Publish JAR to GitHub Packages
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write  # Izin untuk menulis ke GitHub Packages
+
+    steps:
+      # Step 1: Checkout kode repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Setup JDK 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+          # Konfigurasi otomatis untuk publish ke GitHub Packages
+          server-id: github
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_TOKEN
+
+      # Step 3: Cache Maven packages (mempercepat build)
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # Step 4: Build dan jalankan tests
+      - name: Build and Test
+        run: mvn -B test --file pom.xml
+
+      # Step 5: Publish JAR ke GitHub Packages
+      - name: Publish Package to GitHub Packages
+        run: mvn -B deploy -DskipTests --file pom.xml
+        env:
+          MAVEN_USERNAME: ${{ github.actor }}
+          MAVEN_TOKEN: ${{ secrets.GITHUB_TOKEN }}
